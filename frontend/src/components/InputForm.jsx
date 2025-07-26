@@ -67,7 +67,7 @@ const InputForm = ({ onSubmit }) => {
       >
         <h2 className="text-2xl sm:text-3xl font-extrabold text-blue-700 text-center tracking-tight mb-2">🍽️ What did you eat?</h2>
 
-        <div className="w-5/6 justify-items-center textAreaContainer">
+        <div className="w-5/6 justify-items-center textAreaContainer mx-10">
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
