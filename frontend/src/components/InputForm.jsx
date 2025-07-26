@@ -73,7 +73,7 @@ const InputForm = ({ onSubmit }) => {
             onChange={(e) => setDescription(e.target.value)}
             placeholder="E.g., Chicken salad with quinoa and veggies"
             rows={3}
-            className="w-full rounded-sm p-4 border border-gray-200 text-base focus:ring-2 focus:ring-blue-400 min-h-[50px] focus:outline-none transition"
+            className="w-full rounded-sm p-4 border border-gray-200 text-base text-gray-600 focus:ring-2 focus:ring-blue-400 min-h-[50px] focus:outline-none transition"
             id="meal-desc"
           />
         </div>
