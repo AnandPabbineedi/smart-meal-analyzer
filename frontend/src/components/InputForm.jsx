@@ -112,7 +112,7 @@ const InputForm = ({ onSubmit }) => {
             <button
               type="button"
               onClick={() => fileInputRef.current.click()}
-              className="mt-2 px-4 py-2 bg-blue-100 text-blue-700 rounded font-bold hover:bg-blue-200 transition text-sm"
+              className="mt-2 px-4 py-2 w-5/6 bg-blue-100 text-blue-700 rounded font-bold hover:bg-blue-200 transition text-sm"
             >
               Choose File
             </button>
@@ -121,7 +121,7 @@ const InputForm = ({ onSubmit }) => {
 
         <button
           type="submit"
-          className="flex bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-8 rounded-xl text-lg shadow-lg transition transform active:scale-[.98]"
+          className="bg-blue-600 w-5/6 hover:bg-blue-700  text-white font-extrabold py-3 px-8 rounded-xl text-lg shadow-lg transition transform active:scale-[.98]"
         >
           Analyze Meal
         </button>
