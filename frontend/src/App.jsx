@@ -11,7 +11,7 @@ function App() {
     setResult(null);
 
     try {
-      const response = await fetch(`http://${window.location.hostname}:5000/analyze`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/analyze`, {
         method: "POST",
         body: formData, // Sending FormData directly
       });
