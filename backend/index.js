@@ -12,7 +12,7 @@ const PORT = 5000;
 // Middleware
 const allowedOrigins = [
   'http://localhost:5173',               // Vite dev localhost
-  'https://smartmealanalyser.netlify.app/'  //  actual Netlify live URL
+  'https://smartmealanalyser.netlify.app'  //  actual Netlify live URL
 ];
 
 app.use(cors({
