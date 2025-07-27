@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import imageCompression from 'browser-image-compression';
 
 const InputForm = ({ onSubmit }) => {
   const [description, setDescription] = useState("");
@@ -18,27 +19,37 @@ const InputForm = ({ onSubmit }) => {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!imageFile && !description.trim()) {
       setShowDialog(true);
       return;
     }
     const formData = new FormData();
+
     if (imageFile) {
-      formData.append("image", imageFile);
+      try {
+        const compressedFile = await imageCompression(imageFile, {
+          maxSizeMB: 0.5,   
+          maxWidthOrHeight: 1024,
+          useWebWorker: true
+        });
+        formData.append("image", compressedFile);
+      } catch (err) {
+        console.error("Image compression failed:", err);
+        alert("Image compression failed. Please try another image.");
+        return;
+      }
     } else if (description) {
       formData.append('text', description);
-    } else {
-      alert("Please upload an image or enter text");
-      return;
     }
-
+  
     onSubmit(formData);
     setDescription("");
     setImageFile(null);
     fileInputRef.current.value = null;
   };
+  
 
   const handleDrag = (e) => {
     e.preventDefault();
