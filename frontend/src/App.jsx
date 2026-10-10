@@ -19,10 +19,11 @@ function App() {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok || data.error) {
         setError(
-          "That meal couldn't be analyzed. Try a clearer, well-lit photo, or describe the meal in words."
+          data.error ||
+            "That meal couldn't be analyzed. Try a clearer, well-lit photo, or describe the meal in words."
         );
       } else {
         setResult(data);

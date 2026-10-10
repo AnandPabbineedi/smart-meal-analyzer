@@ -54,9 +54,13 @@ const InputForm = ({ onSubmit, loading }) => {
         formData.append("image", compressed);
         photoUrl = URL.createObjectURL(compressed);
       } catch (err) {
-        console.error("Image compression failed:", err);
-        setHint("That photo couldn't be processed. Try a different image.");
-        return;
+        // Some formats (like iPhone HEIC) can't be compressed in the browser; send the original if it's small enough
+        if (imageFile.size > 5 * 1024 * 1024) {
+          setHint("That photo is too large. Try one under 5 MB.");
+          return;
+        }
+        formData.append("image", imageFile);
+        photoUrl = null;
       }
     }
     if (description.trim()) formData.append("text", description.trim());
