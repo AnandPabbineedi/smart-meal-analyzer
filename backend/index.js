@@ -7,12 +7,13 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 dotenv.config();
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 const allowedOrigins = [
   'http://localhost:5173',               // Vite dev localhost
-  'https://smartmealanalyser.netlify.app'  //  actual Netlify live URL
+  'https://smartmealanalyser.netlify.app',  // Netlify URL
+  'https://meal.anandpabbineedi.site'       // custom domain
 ];
 
 app.use(cors({
@@ -32,9 +33,15 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
 // Gemini setup
-const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
-const modelText = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-const modelVision = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+// gemini-1.5-pro has been retired; model is configurable via GEMINI_MODEL
+const apiKey = process.env.GEMINI_API_KEY || process.env.REACT_APP_GEMINI_API_KEY;
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const genAI = new GoogleGenerativeAI(apiKey);
+const modelText = genAI.getGenerativeModel({ model: MODEL });
+const modelVision = genAI.getGenerativeModel({ model: MODEL });
+
+// Health check (useful for Render and uptime pings)
+app.get('/', (req, res) => res.json({ status: 'ok', model: MODEL }));
 
 // Analyze Food API Endpoint->>>
 app.post('/analyze', upload.single('image'), async (req, res) => {
@@ -47,9 +54,7 @@ app.post('/analyze', upload.single('image'), async (req, res) => {
       const imageData = fs.readFileSync(imageFile.path);
       const base64Image = imageData.toString('base64');
       const prompt = `
-        You are a nutrition expert. Analyze the following meal and return a response in the exact JSON format below.
-
-        Meal: ${imageData}
+        You are a nutrition expert. Analyze the meal in the attached image and return a response in the exact JSON format below.
 
         Format:
         {
