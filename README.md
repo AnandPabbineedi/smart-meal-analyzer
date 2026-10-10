@@ -1,94 +1,121 @@
-````md
-# 🥗 Smart Meal Analyzer
+# Smart Meal Analyzer
 
-An intelligent web app that analyzes meals from uploaded images and provides nutritional information like calories, protein, fats, carbs, and more.
+Snap a photo of your meal or describe it, and get a nutrition label with calories, macros, and a health score.
 
----
+**Live demo:** [meal.anandpabbineedi.site](https://meal.anandpabbineedi.site)
 
-## 🚀 Features
+![Smart Meal Analyzer showing a nutrition facts label for idli with sambar](docs/screenshot.png)
 
-- 📷 Upload an image of your meal
-- 🧠 Get real-time AI-based nutritional analysis
-- 📱 Mobile-responsive UI using TailwindCSS
-- ⚡ Fast and clean experience built with Vite + React
+> The backend runs on a free server, so the first request can take up to a minute while it wakes up.
 
----
+## Features
 
-## 🛠 Tech Stack
+- **Photo, text, or both.** Upload a meal photo, describe it ("2 idlis with sambar"), or combine them so the description refines portion size.
+- **Nutrition Facts label.** Calories, protein, carbs, and fat, with each macro's share of calories calculated from grams (4 kcal/g for protein and carbs, 9 kcal/g for fat).
+- **Health score and tips.** A score out of 100 with the reasoning behind it, suggestions to improve the meal, and tips for weight loss, muscle gain, or general health.
+- **Non-food detection.** Photos that aren't food get a clear message instead of a made-up label.
 
-- **Frontend:** React + Vite + TailwindCSS
-- **Backend:** Node.js / Express (with Google Gemini as a model)
-- **Deployment:** Netlify (Frontend)
+## How it works
 
----
+```mermaid
+flowchart LR
+    A[React app] -->|compressed image + text| B[Express API]
+    B -->|rate limit and validate| B
+    B -->|image as inline data + prompt| C[Google Gemini]
+    C -->|structured JSON| B
+    B -->|normalized result| A
+```
 
-## 📦 Getting Started
+1. The browser compresses the photo (max 1024px, about 0.5 MB) before upload, so requests stay fast on mobile data.
+2. The Express API checks rate limits, validates the file (JPG, PNG, WEBP, or HEIC up to 5 MB) and the description (up to 500 characters).
+3. The image goes to Gemini as inline data, held in memory and never written to disk, with a prompt that requires JSON output.
+4. The server parses and normalizes the JSON, rejects non-food results, and returns a consistent shape to the frontend.
 
-### 1️⃣ Clone the Repository
+## Engineering decisions
+
+| Decision | Why |
+|---|---|
+| Enforced JSON output (`responseMimeType: application/json`) | LLMs sometimes wrap JSON in prose or code fences. Asking for JSON at the API level, plus a fallback parser, makes the response reliably machine-readable. |
+| In-memory uploads with `multer.memoryStorage()` | Nothing touches disk, so there are no leftover files when a request fails and no file cleanup to manage. |
+| Per-IP rate limit plus a global daily cap | The demo is public and every request costs API quota. The per-IP limit stops one visitor from draining it; the daily cap is a hard ceiling on cost. |
+| Origin allowlist (CORS) | Only this app's own domains can call the API from a browser. |
+| Configurable model (`GEMINI_MODEL`) | Google retires models regularly. Switching is an environment variable change, not a code change. |
+
+## Tech stack
+
+- **Frontend:** React 19, Vite, browser-image-compression
+- **Backend:** Node.js, Express 5, Multer
+- **AI:** Google Gemini (multimodal) via `@google/generative-ai`
+- **Hosting:** Netlify (frontend), Render (backend), custom domain with HTTPS
+
+## API
+
+`POST /analyze` (multipart form)
+
+| Field | Type | Notes |
+|---|---|---|
+| `image` | file, optional | JPG, PNG, WEBP, or HEIC, up to 5 MB |
+| `text` | string, optional | Meal description, up to 500 characters |
+
+At least one is required. Returns `food_name`, `calories`, `protein`, `carbs`, `fat`, `score`, `scoreReason`, `suggestions`, and `goalTips`. Errors return `{ "error": "message" }` with status 400, 413, 422 (not food), 429 (rate limited), 502 (unreadable AI response), or 500.
+
+`GET /` returns a health check with the active model.
+
+## Run locally
+
+**Backend**
 
 ```bash
-git clone https://github.com/your-username/smart-meal-analyzer.git
-cd smart-meal-analyzer
-````
-
-### 2️⃣ Install Dependencies
-
-```bash
+cd backend
 npm install
 ```
 
-### 3️⃣ Start the Development Server
+Create `backend/.env`:
+
+```env
+GEMINI_API_KEY=your_key_from_google_ai_studio
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+```bash
+node index.js
+```
+
+**Frontend**
+
+```bash
+cd frontend
+npm install
+```
+
+Create `frontend/.env`:
+
+```env
+VITE_API_URL=http://localhost:5000
+```
 
 ```bash
 npm run dev
 ```
 
-Visit: [http://localhost:5173](http://localhost:5173)
+Open http://localhost:5173.
 
----
+## Configuration
 
-## 🔗 Connect to Backend
+| Variable | Default | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | (required) | Google AI Studio API key |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model to use |
+| `HOURLY_LIMIT_PER_IP` | `15` | Analyses per visitor per hour |
+| `DAILY_LIMIT` | `300` | Total analyses per day across all visitors |
+| `PORT` | `5000` | Server port |
 
-Create a `.env` file in the root of your project and add:
+## Limitations and next steps
 
-```env
-VITE_BACKEND_URL=http://localhost:5000
-```
+- Nutrition values are AI estimates from a photo, not lab measurements.
+- Rate limit counters live in memory and reset when the server restarts. A shared store like Redis would make them durable across instances.
+- Possible additions: a meal history with daily totals, and user-confirmed portion sizes to improve accuracy.
 
-Or use your live API backend URL:
+## Author
 
-```env
-VITE_BACKEND_URL=https://your-api-url.com
-```
-
----
-
-## 🌍 Deploying on Netlify
-
-1. Push your code to GitHub
-2. Go to [https://netlify.com](https://netlify.com)
-3. Create a new site from Git
-4. Use these settings:
-
-```
-Build Command: npm run build
-Publish Directory: dist
-```
-
-5. Add environment variable `VITE_BACKEND_URL` in Netlify settings
-
----
-
----
-
-## 🙏 Credits
-
-Made with 💪 by \Anand
-
----
-
-## 📄 License
-
-MIT License - free to use, modify, and distribute.
-
-```
+Built by [Anand Pabbineedi](https://anandpabbineedi.site). [LinkedIn](https://www.linkedin.com/in/anand-pabbineedi-6b3b93257/)
