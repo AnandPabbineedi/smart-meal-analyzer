@@ -4,6 +4,7 @@ import multer from 'multer';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { perIpLimit, dailyCap } from './limiter.js';
+import { getAvailableLeastModels, generateContentWithDynamicFallback } from './modelManager.js';
 
 dotenv.config();
 const app = express();
@@ -34,11 +35,8 @@ const upload = multer({
 });
 
 const apiKey = process.env.GEMINI_API_KEY || process.env.REACT_APP_GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-  model: MODEL,
-  generationConfig: { responseMimeType: 'application/json' },
-});
+const PREFERRED_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash-8b';
+const genAI = new GoogleGenerativeAI(apiKey);
 
 const MAX_TEXT = 500;
 const FORMAT = `{
@@ -80,7 +78,14 @@ function parseJson(text) {
   return JSON.parse(match ? match[1] : text);
 }
 
-app.get('/', (req, res) => res.json({ status: 'ok', model: MODEL }));
+app.get('/', async (req, res) => {
+  const availableModels = await getAvailableLeastModels(apiKey);
+  res.json({
+    status: 'ok',
+    preferredModel: PREFERRED_MODEL,
+    availableFallbackModels: availableModels,
+  });
+});
 
 const limits = [
   perIpLimit({ windowMs: 60 * 60 * 1000, max: Number(process.env.HOURLY_LIMIT_PER_IP || 15),
@@ -106,10 +111,17 @@ app.post('/analyze', limits, upload.single('image'), async (req, res) => {
       parts.push({ inlineData: { mimeType: imageFile.mimetype, data: imageFile.buffer.toString('base64') } });
     }
 
-    const response = await model.generateContent(parts);
+    const { text: resultText, modelUsed } = await generateContentWithDynamicFallback({
+      genAI,
+      apiKey,
+      parts,
+      preferredModel: PREFERRED_MODEL,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
     let data;
     try {
-      data = parseJson(response.response.text());
+      data = parseJson(resultText);
     } catch {
       return res.status(502).json({ error: "Couldn't read the analysis. Please try again." });
     }
@@ -117,12 +129,13 @@ app.post('/analyze', limits, upload.single('image'), async (req, res) => {
     if (data.isFood === false) {
       return res.status(422).json({ error: "That doesn't look like food. Try a photo of a meal or describe what you ate." });
     }
-    res.json(toResult(data));
+    res.set('X-AI-Model-Used', modelUsed);
+    res.json({ ...toResult(data), _modelUsed: modelUsed });
   } catch (err) {
-    console.error('❌ Error:', err?.message || err);
+    console.error('❌ Error after exhausting all models:', err?.message || err);
     const msg = String(err?.message || '');
     if (err?.status === 429 || msg.includes('429')) {
-      return res.status(429).json({ error: 'The AI service is busy or out of quota right now. Try again later.' });
+      return res.status(429).json({ error: 'The AI service is busy or out of quota across all available models right now. Try again later.' });
     }
     if (msg.includes('SAFETY')) {
       return res.status(422).json({ error: "This image couldn't be analyzed. Try a different photo." });

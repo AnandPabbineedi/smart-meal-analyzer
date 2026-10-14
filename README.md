@@ -39,7 +39,8 @@ flowchart LR
 | In-memory uploads with `multer.memoryStorage()` | Nothing touches disk, so there are no leftover files when a request fails and no file cleanup to manage. |
 | Per-IP rate limit plus a global daily cap | The demo is public and every request costs API quota. The per-IP limit stops one visitor from draining it; the daily cap is a hard ceiling on cost. |
 | Origin allowlist (CORS) | Only this app's own domains can call the API from a browser. |
-| Configurable model (`GEMINI_MODEL`) | Google retires models regularly. Switching is an environment variable change, not a code change. |
+| Dynamic least-token model fallback | If a model hits traffic limits (HTTP 429 quota/rate limit) or is unavailable (HTTP 404/503), the server dynamically checks and attempts the least token-consuming models (`gemini-1.5-flash-8b`, `gemini-2.0-flash-lite`, `gemini-1.5-flash`, `gemini-2.0-flash`, `gemini-1.5-pro`) before presenting an error to the user. |
+| Configurable model (`GEMINI_MODEL`) | Optional preference override. Defaults to the most token-efficient lightweight model (`gemini-1.5-flash-8b`). |
 
 ## Tech stack
 
@@ -74,7 +75,7 @@ Create `backend/.env`:
 
 ```env
 GEMINI_API_KEY=your_key_from_google_ai_studio
-GEMINI_MODEL=gemini-3.8-flash
+GEMINI_MODEL=gemini-1.5-flash-8b
 ```
 
 ```bash
@@ -105,7 +106,7 @@ Open http://localhost:5173.
 | Variable | Default | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | (required) | Google AI Studio API key |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model to use |
+| `GEMINI_MODEL` | `gemini-1.5-flash-8b` | Preferred Gemini model (dynamically falls back to least token models if busy/unavailable) |
 | `HOURLY_LIMIT_PER_IP` | `15` | Analyses per visitor per hour |
 | `DAILY_LIMIT` | `300` | Total analyses per day across all visitors |
 | `PORT` | `5000` | Server port |
