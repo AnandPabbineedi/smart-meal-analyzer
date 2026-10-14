@@ -2,12 +2,20 @@
 // Dynamic Gemini model selector with least-token prioritization and automatic fallback.
 
 export const TOKEN_RANKED_MODELS = [
-  'gemini-1.5-flash-8b',             // Lowest latency, least token consumption & compute cost (8B parameter model)
-  'gemini-2.0-flash-lite',          // Google's 2.0 lite model optimized for low token/compute cost
-  'gemini-2.0-flash-lite-preview-02-05',
-  'gemini-1.5-flash',               // Standard high-speed multimodal model
-  'gemini-2.0-flash',               // Next-gen 2.0 multimodal model
-  'gemini-1.5-pro',                 // Higher capability fallback if all flash tiers are exhausted
+  'gemini-3.5-flash-lite',               // Lowest token consumption & compute footprint, high throughput
+  'gemini-flash-lite-latest',           // Alias for latest flash-lite
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',                   // Fast standard model
+  'gemini-3-flash-preview',
+  'gemini-3.8-flash',
+  'gemini-flash-latest',
+  'gemini-1.5-flash-8b',                // Legacy lightweight model
+  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.5-pro',
+  'gemini-pro-latest',
+  'gemini-1.5-pro',
 ];
 
 let cachedAvailableModels = null;
