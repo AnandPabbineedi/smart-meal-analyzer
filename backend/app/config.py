@@ -1,8 +1,9 @@
 """Application configuration settings."""
 
 from functools import lru_cache
-from typing import List
-from pydantic import Field
+import json
+from typing import List, Union
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,11 +31,41 @@ class Settings(BaseSettings):
     daily_limit: int = Field(default=300, alias="DAILY_LIMIT")
 
     # Allowed CORS Origins
-    allowed_origins: List[str] = [
-        "http://localhost:5173",
-        "https://smartmealanalyser.netlify.app",
-        "https://meal.anandpabbineedi.site",
-    ]
+    allowed_origins: Union[str, List[str]] = Field(
+        default=[
+            "http://localhost:5173",
+            "https://smartmealanalyser.netlify.app",
+            "https://meal.anandpabbineedi.site",
+        ],
+        alias="ALLOWED_ORIGINS",
+    )
+
+    @field_validator("allowed_origins")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str], None]) -> List[str]:
+        defaults = [
+            "http://localhost:5173",
+            "https://smartmealanalyser.netlify.app",
+            "https://meal.anandpabbineedi.site",
+        ]
+        if v is None:
+            return defaults
+        if isinstance(v, str):
+            val = v.strip()
+            if not val:
+                return defaults
+            if val.startswith("[") and val.endswith("]"):
+                try:
+                    parsed = json.loads(val)
+                    if isinstance(parsed, list):
+                        return list(dict.fromkeys(defaults + [str(x) for x in parsed]))
+                except Exception:
+                    pass
+            origins = [x.strip() for x in val.split(",") if x.strip()]
+            return list(dict.fromkeys(defaults + origins))
+        if isinstance(v, list):
+            return list(dict.fromkeys(defaults + [str(x) for x in v]))
+        return defaults
 
     @property
     def api_key(self) -> str:
