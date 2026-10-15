@@ -19,34 +19,35 @@ Snap a photo of your meal or describe it, and get a nutrition label with calorie
 
 ```mermaid
 flowchart LR
-    A[React app] -->|compressed image + text| B[Express API]
+    A[React app] -->|compressed image + text| B[FastAPI Backend]
     B -->|rate limit and validate| B
-    B -->|image as inline data + prompt| C[Google Gemini]
-    C -->|structured JSON| B
-    B -->|normalized result| A
+    B -->|image bytes + structured prompt| C[Google Gemini]
+    C -->|JSON schema output| B
+    B -->|Pydantic validated result| A
 ```
 
 1. The browser compresses the photo (max 1024px, about 0.5 MB) before upload, so requests stay fast on mobile data.
-2. The Express API checks rate limits, validates the file (JPG, PNG, WEBP, or HEIC up to 5 MB) and the description (up to 500 characters).
-3. The image goes to Gemini as inline data, held in memory and never written to disk, with a prompt that requires JSON output.
-4. The server parses and normalizes the JSON, rejects non-food results, and returns a consistent shape to the frontend.
+2. The FastAPI backend validates rate limits, checks file types (JPG, PNG, WEBP, or HEIC up to 5 MB) and validates description constraints via Pydantic.
+3. The image goes to Gemini as inline bytes in memory, never persisted to disk, with response schema enforced.
+4. The server validates and normalizes the payload using Pydantic v2 models, filters non-food inputs, and returns a clean, typed response.
 
 ## Engineering decisions
 
 | Decision | Why |
 |---|---|
-| Enforced JSON output (`responseMimeType: application/json`) | LLMs sometimes wrap JSON in prose or code fences. Asking for JSON at the API level, plus a fallback parser, makes the response reliably machine-readable. |
-| In-memory uploads with `multer.memoryStorage()` | Nothing touches disk, so there are no leftover files when a request fails and no file cleanup to manage. |
-| Per-IP rate limit plus a global daily cap | The demo is public and every request costs API quota. The per-IP limit stops one visitor from draining it; the daily cap is a hard ceiling on cost. |
+| FastAPI & Pydantic v2 | High-performance asynchronous execution, automatic request validation, self-documenting OpenAPI schemas, and strict data modeling. |
+| In-memory image processing | Memory-only buffer handling with zero disk I/O eliminates leftover files and prevents disk exhaustion attacks. |
+| Per-IP rate limit plus global daily cap | In-memory sliding window rate limiter protects quota against abuse without requiring external database dependencies. |
+| Dynamic least-token model fallback | If a model hits traffic limits (HTTP 429 quota/rate limit) or is unavailable (HTTP 404/503), the server dynamically checks and attempts the least token-consuming models (`gemini-3.5-flash-lite`, `gemini-flash-lite-latest`, `gemini-2.5-flash`, etc.) before presenting an error to the user. |
 | Origin allowlist (CORS) | Only this app's own domains can call the API from a browser. |
-| Dynamic least-token model fallback | If a model hits traffic limits (HTTP 429 quota/rate limit) or is unavailable (HTTP 404/503), the server dynamically checks and attempts the least token-consuming models (`gemini-1.5-flash-8b`, `gemini-2.0-flash-lite`, `gemini-1.5-flash`, `gemini-2.0-flash`, `gemini-1.5-pro`) before presenting an error to the user. |
-| Configurable model (`GEMINI_MODEL`) | Optional preference override. Defaults to the most token-efficient lightweight model (`gemini-1.5-flash-8b`). |
+| Configurable model (`GEMINI_MODEL`) | Optional preference override. Defaults to the most token-efficient lightweight model (`gemini-3.5-flash-lite`). |
 
 ## Tech stack
 
 - **Frontend:** React 19, Vite, browser-image-compression
-- **Backend:** Node.js, Express 5, Multer
-- **AI:** Google Gemini (multimodal) via `@google/generative-ai`
+- **Backend:** Python 3.12+, FastAPI, Uvicorn, Pydantic v2
+- **AI:** Google Gemini via `google-genai` Python SDK
+- **Testing:** Pytest, HTTPX
 - **Hosting:** Netlify (frontend), Render (backend), custom domain with HTTPS
 
 ## API
@@ -64,22 +65,33 @@ At least one is required. Returns `food_name`, `calories`, `protein`, `carbs`, `
 
 ## Run locally
 
-**Backend**
+**Backend (Python FastAPI)**
 
 ```bash
 cd backend
-npm install
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 Create `backend/.env`:
 
 ```env
 GEMINI_API_KEY=your_key_from_google_ai_studio
-GEMINI_MODEL=gemini-1.5-flash-8b
+GEMINI_MODEL=gemini-3.5-flash-lite
+PORT=5000
 ```
 
+Run the API:
+
 ```bash
-node index.js
+uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
+```
+
+Run tests:
+
+```bash
+pytest -v
 ```
 
 **Frontend**
@@ -106,7 +118,7 @@ Open http://localhost:5173.
 | Variable | Default | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | (required) | Google AI Studio API key |
-| `GEMINI_MODEL` | `gemini-1.5-flash-8b` | Preferred Gemini model (dynamically falls back to least token models if busy/unavailable) |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Preferred Gemini model (dynamically falls back to least-token models if busy/unavailable) |
 | `HOURLY_LIMIT_PER_IP` | `15` | Analyses per visitor per hour |
 | `DAILY_LIMIT` | `300` | Total analyses per day across all visitors |
 | `PORT` | `5000` | Server port |
