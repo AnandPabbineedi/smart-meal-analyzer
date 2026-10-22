@@ -1,5 +1,6 @@
 """Dynamic Gemini model discovery and least-token prioritization."""
 
+import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional
@@ -96,17 +97,23 @@ async def generate_content_with_dynamic_fallback(
     for model_name in candidates:
         try:
             logger.info("Attempting meal analysis with model: %s...", model_name)
-            # Synchronous generate_content called in threadpool or native async client
-            response = await client.aio.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=config,
+            # Asynchronous generation with per-model asyncio timeout resilience
+            response = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                ),
+                timeout=25.0,
             )
             logger.info("Successfully analyzed meal with model: %s", model_name)
             return {
                 "text": response.text,
                 "model_used": model_name,
             }
+        except asyncio.TimeoutError:
+            logger.warning("Model %s timed out after 25s. Cascading to fallback model...", model_name)
+            continue
         except Exception as exc:
             last_error = exc
             err_msg = str(exc)
