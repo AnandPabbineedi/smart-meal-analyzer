@@ -44,7 +44,8 @@ const InputForm = ({ onSubmit, loading }) => {
 
   const clearPhoto = () => {
     setImageFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = null;
+    setPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (e) => {
@@ -99,17 +100,17 @@ const InputForm = ({ onSubmit, loading }) => {
   return (
     <form className="form" onSubmit={handleSubmit} autoComplete="off">
       <div
-        className={`drop ${dragActive ? "is-drag" : ""} ${preview ? "has-photo" : ""}`}
+        className={`drop ${dragActive ? "is-drag" : ""} ${preview && imageFile ? "has-photo" : ""}`}
         onDragEnter={onDrag}
         onDragOver={onDrag}
         onDragLeave={onDrag}
         onDrop={onDrop}
       >
-        {preview ? (
+        {preview && imageFile ? (
           <div className="drop-preview">
             <img src={preview} alt="Your meal" />
             <div className="drop-preview-meta">
-              <span className="file-name">{imageFile.name}</span>
+              <span className="file-name">{imageFile?.name || ""}</span>
               <div className="drop-actions">
                 <button
                   type="button"
