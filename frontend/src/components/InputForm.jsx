@@ -14,9 +14,22 @@ const InputForm = ({ onSubmit, loading }) => {
       setPreview(null);
       return;
     }
-    const url = URL.createObjectURL(imageFile);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
+    let isMounted = true;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (isMounted) {
+        setPreview(e.target.result);
+      }
+    };
+    reader.onerror = () => {
+      if (isMounted) {
+        setPreview(null);
+      }
+    };
+    reader.readAsDataURL(imageFile);
+    return () => {
+      isMounted = false;
+    };
   }, [imageFile]);
 
   const pickFile = (file) => {
@@ -42,25 +55,27 @@ const InputForm = ({ onSubmit, loading }) => {
     }
     setHint("");
     const formData = new FormData();
-    let photoUrl = null;
+    const photoUrl = preview; // Use the base64 preview for the result card
 
     if (imageFile) {
-      try {
-        const compressed = await imageCompression(imageFile, {
-          maxSizeMB: 0.5,
-          maxWidthOrHeight: 1024,
-          useWebWorker: true,
-        });
-        formData.append("image", compressed);
-        photoUrl = URL.createObjectURL(compressed);
-      } catch (err) {
-        // Some formats (like iPhone HEIC) can't be compressed in the browser; send the original if it's small enough
-        if (imageFile.size > 5 * 1024 * 1024) {
-          setHint("That photo is too large. Try one under 5 MB.");
-          return;
-        }
+      if (imageFile.size <= 1024 * 1024) {
+        // Files <= 1MB can be sent directly without compression overhead
         formData.append("image", imageFile);
-        photoUrl = null;
+      } else {
+        try {
+          const compressed = await imageCompression(imageFile, {
+            maxSizeMB: 1.0,
+            maxWidthOrHeight: 1280,
+            useWebWorker: false, // Avoid worker blob creation issues
+          });
+          formData.append("image", compressed, imageFile.name);
+        } catch (err) {
+          if (imageFile.size > 5 * 1024 * 1024) {
+            setHint("That photo is too large. Try one under 5 MB.");
+            return;
+          }
+          formData.append("image", imageFile);
+        }
       }
     }
     if (description.trim()) formData.append("text", description.trim());

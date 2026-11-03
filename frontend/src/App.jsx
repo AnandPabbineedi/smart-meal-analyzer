@@ -2,6 +2,26 @@ import { useState } from "react";
 import InputForm from "./components/InputForm";
 import ResultCard from "./components/ResultCard";
 
+async function safeFetch(url, options) {
+  try {
+    return await window.fetch(url, options);
+  } catch (err) {
+    // If a browser extension (like Similarweb frame_ant.js) monkey-patched fetch and threw,
+    // fallback to the browser's clean native fetch
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+      const cleanFetch = iframe.contentWindow.fetch;
+      const res = await cleanFetch(url, options);
+      document.body.removeChild(iframe);
+      return res;
+    } catch {
+      throw err;
+    }
+  }
+}
+
 function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -16,7 +36,7 @@ function App() {
 
     try {
       const apiUrl = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
-      const response = await fetch(`${apiUrl}/analyze`, {
+      const response = await safeFetch(`${apiUrl}/analyze`, {
         method: "POST",
         body: formData,
       });
