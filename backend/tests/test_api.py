@@ -71,3 +71,12 @@ def test_analyze_non_food_rejected(client: TestClient):
         response = client.post("/analyze", data={"text": "A picture of a laptop"})
         assert response.status_code == 422
         assert "That doesn't look like food" in response.json()["error"]
+
+
+def test_analyze_double_slash_normalized(client: TestClient):
+    """Verifies that requests with double slashes (e.g. //analyze) are correctly handled."""
+    response = client.post("http://testserver//analyze", data={})
+    # Should reach endpoint validation (400) rather than Starlette 404
+    assert response.status_code == 400
+    assert "Add a photo or describe your meal." in response.json()["error"]
+

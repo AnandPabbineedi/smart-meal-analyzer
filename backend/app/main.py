@@ -2,12 +2,14 @@
 
 from contextlib import asynccontextmanager
 import logging
+import re
 from typing import Optional
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from google import genai
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .config import Settings, get_settings
 from .schemas.meal import ErrorResponse, HealthStatusResponse, MealAnalysisResponse
@@ -63,6 +65,23 @@ app = FastAPI(
     description="Multimodal meal nutrition analyzer powered by Google Gemini and FastAPI.",
     lifespan=lifespan,
 )
+
+
+class NormalizePathMiddleware:
+    """Normalizes paths by collapsing consecutive duplicate slashes (e.g. //analyze -> /analyze)."""
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] in ("http", "websocket") and "//" in scope.get("path", ""):
+            scope["path"] = re.sub(r"/+", "/", scope["path"])
+            if "raw_path" in scope:
+                scope["raw_path"] = re.sub(rb"/+", b"/", scope["raw_path"])
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(NormalizePathMiddleware)
 
 # CORS Configuration
 settings = get_settings()
@@ -141,6 +160,7 @@ async def health_check(settings: Settings = Depends(get_settings)):
     dependencies=[Depends(check_rate_limits)],
     summary="Analyze meal photo and/or description",
 )
+@app.post("//analyze", include_in_schema=False, dependencies=[Depends(check_rate_limits)])
 async def analyze(
     response: Response,
     text: Optional[str] = Form(default=None),

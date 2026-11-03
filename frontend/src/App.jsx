@@ -15,7 +15,8 @@ function App() {
     setAnalyzedPhoto(photoUrl);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/analyze`, {
+      const apiUrl = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+      const response = await fetch(`${apiUrl}/analyze`, {
         method: "POST",
         body: formData,
       });
