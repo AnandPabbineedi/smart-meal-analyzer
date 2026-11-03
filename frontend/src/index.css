@@ -131,6 +131,9 @@ button { font: inherit; cursor: pointer; }
   cursor: pointer;
   text-align: center;
 }
+.drop-empty * {
+  pointer-events: none;
+}
 .plate { width: 44px; height: 44px; color: var(--leaf); margin-bottom: 8px; }
 .drop-title { font-weight: 700; font-size: 1.05rem; }
 .drop-sub { color: var(--muted); font-size: 0.9rem; }

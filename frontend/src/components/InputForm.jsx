@@ -9,6 +9,19 @@ const InputForm = ({ onSubmit, loading }) => {
   const [hint, setHint] = useState("");
   const fileInputRef = useRef(null);
 
+  // Prevent default window drag/drop behavior to avoid browser opening dropped files
+  useEffect(() => {
+    const preventDefaults = (e) => {
+      e.preventDefault();
+    };
+    window.addEventListener("dragover", preventDefaults);
+    window.addEventListener("drop", preventDefaults);
+    return () => {
+      window.removeEventListener("dragover", preventDefaults);
+      window.removeEventListener("drop", preventDefaults);
+    };
+  }, []);
+
   useEffect(() => {
     if (!imageFile) {
       setPreview(null);
@@ -34,7 +47,11 @@ const InputForm = ({ onSubmit, loading }) => {
 
   const pickFile = (file) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
+    const isImage =
+      (file.type && file.type.startsWith("image/")) ||
+      /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif|jfif|tiff?)$/i.test(file.name || "");
+
+    if (!isImage) {
       setHint("That file isn't an image. Choose a JPG, PNG or HEIC photo.");
       return;
     }
@@ -84,27 +101,56 @@ const InputForm = ({ onSubmit, loading }) => {
     onSubmit(formData, photoUrl);
   };
 
-  const onDrag = (e) => {
+  const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragActive(e.type === "dragover" || e.type === "dragenter");
+    setDragActive(true);
   };
 
-  const onDrop = (e) => {
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+    if (!dragActive) setDragActive(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDragActive(false);
+  };
+
+  const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    pickFile(e.dataTransfer.files?.[0]);
+
+    let droppedFile = null;
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      droppedFile = e.dataTransfer.files[0];
+    } else if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      droppedFile = e.dataTransfer.items[0].getAsFile();
+    }
+
+    if (droppedFile) {
+      pickFile(droppedFile);
+    }
   };
 
   return (
     <form className="form" onSubmit={handleSubmit} autoComplete="off">
       <div
         className={`drop ${dragActive ? "is-drag" : ""} ${preview && imageFile ? "has-photo" : ""}`}
-        onDragEnter={onDrag}
-        onDragOver={onDrag}
-        onDragLeave={onDrag}
-        onDrop={onDrop}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={(e) => {
+          if (!preview && !e.target.closest("button")) {
+            fileInputRef.current?.click();
+          }
+        }}
       >
         {preview && imageFile ? (
           <div className="drop-preview">
